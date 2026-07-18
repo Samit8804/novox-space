@@ -216,7 +216,7 @@ export default function PlanetDashboard({ dest, content }: DashboardProps) {
             </div>
 
             <div className="order-1 lg:order-2 flex items-center justify-center">
-              <div className="relative w-72 h-72 lg:w-96 lg:h-96">
+              <div className="relative w-72 h-72 lg:w-96 lg:h-96 rounded-full overflow-hidden bg-transparent">
                 <div
                   className="absolute inset-0 rounded-full blur-[80px] animate-pulse"
                   style={{ background: GLOW_COLOR[accent] }}
@@ -224,7 +224,7 @@ export default function PlanetDashboard({ dest, content }: DashboardProps) {
                 <img
                   src={dest.image}
                   alt={dest.name}
-                  className="w-full h-full object-contain drop-shadow-2xl relative z-10"
+                  className="w-full h-full object-contain relative z-10 bg-transparent"
                   style={{
                     animation: "planetFloat 8s ease-in-out infinite, rotatePlanet 180s linear infinite",
                   }}

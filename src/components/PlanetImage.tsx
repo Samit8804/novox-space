@@ -228,11 +228,16 @@ export default function PlanetImage({
       const rotation = animate ? (Date.now() - startTime.current) / 8000 : 0;
 
       if (showGlow && cfg.glowColor) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy + floatY, size * cfg.radius * 1.8, 0, Math.PI * 2);
+        ctx.clip();
         const glowGrad = ctx.createRadialGradient(cx, cy + floatY, size * cfg.radius * 0.2, cx, cy + floatY, size * cfg.radius * 2);
         glowGrad.addColorStop(0, cfg.glowColor);
         glowGrad.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = glowGrad;
         ctx.fillRect(0, 0, size, size);
+        ctx.restore();
       }
 
       if (showShadow) {
@@ -270,8 +275,8 @@ export default function PlanetImage({
   }, [visible, size, planetId, showGlow, showShadow, animate, dpr]);
 
   return (
-    <div ref={containerRef} className={`inline-flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
-      <canvas ref={canvasRef} style={{ width: size, height: size, imageRendering: "auto" }} />
+    <div ref={containerRef} className={`inline-flex items-center justify-center ${className}`} style={{ width: size, height: size, background: "transparent" }}>
+      <canvas ref={canvasRef} style={{ width: size, height: size, imageRendering: "auto", background: "transparent" }} />
     </div>
   );
 }
