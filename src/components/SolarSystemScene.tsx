@@ -417,34 +417,18 @@ function NebulaBackground() {
   );
 }
 
-function warnMissingAsset(path: string) {
-  console.warn(`[NovaX Planet Assets] Missing or corrupted: ${path}. Expected asset at: /public${path}. Using procedural fallback.`);
-}
-
 function loadPlanetTexture(nodeId: string): THREE.Texture {
   const imgPath = `/images/${nodeId === "pluto" ? "plotu" : nodeId}.png`;
-  if (typeof window !== "undefined") {
-    const img = new Image();
-    img.onerror = () => warnMissingAsset(imgPath);
-    img.src = imgPath;
-    const tex = new THREE.Texture(img);
-    img.onload = () => {
-      const cvs = document.createElement("canvas");
-      cvs.width = img.width; cvs.height = img.height;
-      const ctx = cvs.getContext("2d")!;
-      ctx.drawImage(img, 0, 0);
-      const id = ctx.getImageData(0, 0, 1, 1);
-      if (id.data[0] === 0 && id.data[1] === 0 && id.data[2] === 0 && id.data[3] === 0) {
-        tex.needsUpdate = true;
-        return;
-      }
-      warnMissingAsset(imgPath);
-      tex.dispose();
-      return getPlanetTexture(nodeId);
-    };
-    return tex;
-  }
-  return getPlanetTexture(nodeId);
+  const loader = new THREE.TextureLoader();
+  const tex = loader.load(imgPath, undefined, undefined, () => {
+    console.warn(`[NovaX] Failed to load ${imgPath}, using procedural`);
+    const fallback = getPlanetTexture(nodeId);
+    Object.assign(tex, fallback);
+    tex.needsUpdate = true;
+  });
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 function createPlanetTexture(nodeId: string): THREE.CanvasTexture {
@@ -556,7 +540,7 @@ function PlanetMesh({ planet, isHovered, isSelected }: { planet: PlanetData; isH
   const ringsRef = useRef<THREE.Mesh>(null);
   const atmosGlowRef = useRef<THREE.Sprite>(null);
 
-  const texture = useMemo(() => getPlanetTexture(planet.node_id), [planet.node_id]);
+  const texture = useMemo(() => loadPlanetTexture(planet.node_id), [planet.node_id]);
   const glowTex = useMemo(() => getGlowTexture(planet.color), [planet.color]);
 
   const hoverScale = isHovered || isSelected ? 1.6 : 1;
@@ -582,10 +566,10 @@ function PlanetMesh({ planet, isHovered, isSelected }: { planet: PlanetData; isH
         <meshStandardMaterial
           map={texture}
           transparent
-          roughness={0.5}
-          metalness={0.05}
+          roughness={0.4}
+          metalness={0.1}
           emissive={new THREE.Color(planet.color)}
-          emissiveIntensity={isHovered ? 0.4 : 0.06}
+          emissiveIntensity={isHovered ? 0.3 : 0.04}
         />
       </mesh>
 
@@ -595,16 +579,15 @@ function PlanetMesh({ planet, isHovered, isSelected }: { planet: PlanetData; isH
 
       {planet.hasRings && (
         <mesh ref={ringsRef} rotation={[1.2 + planet.tilt, 0.3, 0]} scale={hoverScale}>
-          <ringGeometry args={[planet.radius * 1.6, planet.radius * 3.0, 96]} />
+          <ringGeometry args={[planet.radius * 1.3, planet.radius * 2.6, 128]} />
           <meshStandardMaterial
-            color={planet.color}
-            emissive={new THREE.Color(planet.color)}
-            emissiveIntensity={0.2}
-            side={THREE.DoubleSide}
+            map={getRingTexture()}
             transparent
-            opacity={0.45}
-            roughness={0.4}
-            metalness={0.3}
+            opacity={0.6}
+            side={THREE.DoubleSide}
+            roughness={0.7}
+            metalness={0.1}
+            depthWrite={false}
           />
         </mesh>
       )}
@@ -735,6 +718,46 @@ function MoonSprite({ name, parentRadius, onClick }: { name: string; parentRadiu
       </sprite>
     </group>
   );
+}
+
+function createRingTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024; canvas.height = 64;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, 1024, 0);
+  g.addColorStop(0, "rgba(200,180,140,0)");
+  g.addColorStop(0.05, "rgba(200,180,140,0.1)");
+  g.addColorStop(0.15, "rgba(210,190,150,0.5)");
+  g.addColorStop(0.25, "rgba(220,200,160,0.7)");
+  g.addColorStop(0.35, "rgba(200,180,140,0.4)");
+  g.addColorStop(0.45, "rgba(190,170,130,0.6)");
+  g.addColorStop(0.55, "rgba(210,190,150,0.8)");
+  g.addColorStop(0.65, "rgba(180,160,120,0.5)");
+  g.addColorStop(0.75, "rgba(200,180,140,0.3)");
+  g.addColorStop(0.85, "rgba(190,170,130,0.15)");
+  g.addColorStop(1, "rgba(200,180,140,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1024, 64);
+
+  for (let i = 0; i < 200; i++) {
+    const x = Math.random() * 1024;
+    const y = Math.random() * 64;
+    const r = 0.5 + Math.random() * 1.5;
+    ctx.fillStyle = `rgba(180,160,130,${0.1 + Math.random() * 0.3})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const ringTexCache = new Map<string, THREE.CanvasTexture>();
+
+function getRingTexture(): THREE.CanvasTexture {
+  if (!ringTexCache.has("default")) ringTexCache.set("default", createRingTexture());
+  return ringTexCache.get("default")!;
 }
 
 function createGlowTexture(color: string): THREE.CanvasTexture {
@@ -1158,7 +1181,7 @@ export default function SolarSystemScene() {
     <div className="relative h-screen w-full overflow-hidden bg-space-black" onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}>
       <div className="absolute inset-0">
         <Canvas
-          camera={{ position: [0, 25, 45], fov: 50, near: 0.1, far: 500 }}
+          camera={{ position: [10, 18, 35], fov: 45, near: 0.1, far: 500 }}
           gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
           dpr={[1, 2]}
         >
